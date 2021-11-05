@@ -13,7 +13,7 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
-class Genre(TimeStampedModel, models.Model):
+class Genre(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_('Title'), max_length=25)
     description = models.TextField(_('Description'), blank=True)
@@ -27,7 +27,7 @@ class Genre(TimeStampedModel, models.Model):
         return self.name
 
 
-class Person(TimeStampedModel, models.Model):
+class Person(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     full_name = models.CharField(_('Full name'), max_length=128)
     birth_date = models.DateField(_('Birth date'), blank=True)
@@ -46,7 +46,7 @@ class FilmWorkType(models.TextChoices):
     TV_SHOW = 'tv_show', _('TV Show')
 
 
-class FilmWork(TimeStampedModel, models.Model):
+class FilmWork(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(_('Title'), max_length=128)
     description = models.TextField(_('Description'), blank=True)
