@@ -5,9 +5,8 @@ from db_classes import Genre, Person, FilmWork, GenreFilmWork, PersonFilmWork
 
 
 class SQLiteLoader:
-    def __init__(self, connection: sqlite3.Connection):
-        self.connection = connection
-        self.cursor = self.connection.cursor()
+    def __init__(self, sqlite_cursor):
+        self.cursor = sqlite_cursor
 
     def load_movies(self):
         def get_data(table):

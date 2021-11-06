@@ -4,7 +4,6 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
-
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,6 +45,12 @@ class FilmWorkType(models.TextChoices):
     TV_SHOW = 'tv_show', _('TV Show')
 
 
+class PersonRoleType(models.TextChoices):
+    ACTOR = 'actor', _('actor')
+    DIRECTOR = 'director', _('director')
+    WRITER = 'writer', _('writer')
+
+
 class FilmWork(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(_('Title'), max_length=128)
@@ -85,22 +90,25 @@ class FilmWorkGenre(models.Model):
         ]
         verbose_name = "Genres of film"
         verbose_name_plural = _('Genres of film')
+        unique_together = ('film_work_id', 'genre_id', )
 
     def __str__(self):
         return f'{self.film_work_id}'
+
 
 class FilmWorkPerson(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     film_work_id = models.ForeignKey('FilmWork', to_field='id', db_column='film_work_id', on_delete=models.CASCADE)
     person_id = models.ForeignKey('Person', to_field='id', db_column='person_id', on_delete=models.CASCADE)
-    role = models.CharField(_('Role'), max_length=128)
+    role = models.CharField(_('type'), max_length=15, choices=PersonRoleType.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'content\".\"person_film_work'
         indexes = [
-            models.Index(fields=['film_work_id', 'person_id'], name='person_film_work'),
+            models.Index(fields=['film_work_id', 'person_id', 'role'], name='person_film_work'),
         ]
+        unique_together = ('film_work_id', 'person_id', 'role', )
         verbose_name = "Persons of film"
         verbose_name_plural = _('Persons of film')
 

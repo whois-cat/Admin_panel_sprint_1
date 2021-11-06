@@ -2,6 +2,7 @@ import os
 import sqlite3
 import psycopg2
 import logging
+from contextlib import closing
 from dotenv import load_dotenv
 from sqlite_loader import SQLiteLoader
 from postgres_saver import PostgresSaver
@@ -29,5 +30,6 @@ if __name__ == "__main__":
         "host": os.environ.get("DB_HOST"),
         "port": os.environ.get("DB_PORT"),
     }
-    with sqlite3.connect("db.sqlite") as sqlite_conn, psycopg2.connect(**dsn, cursor_factory=DictCursor) as psql_conn:
-        load_from_sqlite(sqlite_conn, psql_conn)
+    with psycopg2.connect(**dsn, cursor_factory=DictCursor) as psql_conn:
+        with closing(sqlite3.connect('db.sqlite').cursor()) as sqlite_cursor:
+            load_from_sqlite(sqlite_cursor, psql_conn)

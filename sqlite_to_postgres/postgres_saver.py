@@ -1,8 +1,21 @@
 import os
-import time
 import logging
 import psycopg2
 from psycopg2.extensions import connection as _connection
+
+
+def measure_time(func):
+    def time_it(*args, **kwargs):
+        time_started = time.time()
+        func(*args, **kwargs)
+        time_elapsed = time.time()
+        logging.info("{execute} running time is {sec} seconds for inserting {rows} rows.".format(execute=func.__name__,
+            sec=round(
+            time_elapsed - time_started,
+            4), rows=len(
+            kwargs.get('values')))
+        )
+    return time_it
 
 
 class PostgresSaver:
@@ -20,7 +33,6 @@ class PostgresSaver:
 
     def save_all_data(self, data):
         for table in data:
-            time_started = time.time()
             for data_table in data[table]:
                 columns_names = data_table.keys()
 
@@ -35,17 +47,14 @@ class PostgresSaver:
                     )
                 except psycopg2.DatabaseError as error:
                     logging.exception(error)
-                    self.psql_cursor.execute(
+                    self.cursor.execute(
                         "select * from pg_tables where schemaname='content';"
                     )
-                    if not bool(self.psql_cursor.rowcount):
+                    if not bool(self.cursor.rowcount):
                         self.create_tables()
 
 
-            time_elapsed = time.time()
             logging.info(
-                "Data from table {} was migrated by {}".format(
-                    table, time_elapsed - time_started
-                )
+                f"Data from {table} was migrated."
             )
         self.connection.commit()

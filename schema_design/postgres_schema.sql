@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS content.genre_film_work (
         ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS film_work_genre ON content.genre_film_work (film_work_id, genre_id);
+CREATE TYPE person_role AS ENUM ('actor', 'director', 'writer');
 
 CREATE TABLE IF NOT EXISTS content.person_film_work (
     id uuid PRIMARY KEY,
@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS content.person_film_work (
     person_id uuid NOT NULL,
     role TEXT NOT NULL,
     created_at TIMESTAMPTZ,
+    UNIQUE (film_work_id, person_id, role),
     FOREIGN KEY (film_work_id)
         REFERENCES content.film_work(id)
         ON UPDATE CASCADE ON DELETE CASCADE,
@@ -59,3 +60,7 @@ CREATE TABLE IF NOT EXISTS content.person_film_work (
         REFERENCES content.person(id)
         ON UPDATE CASCADE ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX film_work_genre ON content.genre_film_work (film_work_id, genre_id);
+
+CREATE UNIQUE INDEX film_work_person_role ON content.person_film_work (film_work_id, person_id, role);
