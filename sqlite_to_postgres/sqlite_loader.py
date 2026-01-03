@@ -1,55 +1,36 @@
-from __future__ import annotations
-
-import logging
 import sqlite3
+import logging
 from dataclasses import asdict
-from typing import Dict, Iterable, Iterator, List, Type
-
-from .db_classes import FilmWork, Genre, GenreFilmWork, Person, PersonFilmWork
-
-
-logger = logging.getLogger(__name__)
-
-TABLE_TO_DATACLASS: Dict[str, Type] = {
-    "genre": Genre,
-    "person": Person,
-    "film_work": FilmWork,
-    "genre_film_work": GenreFilmWork,
-    "person_film_work": PersonFilmWork,
-}
+from db_classes import Genre, Person, FilmWork, GenreFilmWork, PersonFilmWork
 
 
 class SQLiteLoader:
-    """Reads rows from SQLite and converts them into dicts.
-    The dict keys match dataclass field names and, by extension, Postgres columns.
-    """
+    def __init__(self, sqlite_cursor):
+        self.cursor = sqlite_cursor
 
-    def __init__(self, sqlite_conn: sqlite3.Connection):
-        self.conn = sqlite_conn
+    def load_movies(self):
+        table_to_class = {
+            "genre": Genre,
+            "person": Person,
+            "film_work": FilmWork,
+            "genre_film_work": GenreFilmWork,
+            "person_film_work": PersonFilmWork,
+        }
 
-    def iter_table_rows(self, table_name: str, batch_size: int = 1000) -> Iterator[List[dict]]:
+        def get_data(table):
+            try:
+                rows = self.cursor.execute(f'SELECT * FROM "{table}"').fetchall()
+            except sqlite3.Error as error:
+                logging.exception(error)
+                raise
 
-        if table_name not in TABLE_TO_DATACLASS:
-            raise ValueError(f"unknown table: {table_name}")
+            cls = table_to_class[table]
+            data_from_table = [asdict(cls(*row)) for row in rows]
+            return data_from_table
 
-        model_cls = TABLE_TO_DATACLASS[table_name]
-
-        # Use a dedicated cursor for predictable streaming.
-        cursor = self.conn.cursor()
-        cursor.execute(f'SELECT * FROM "{table_name}";')
-
-        while True:
-            rows = cursor.fetchmany(batch_size)
-            if not rows:
-                break
-
-            # Validate shape via dataclass constructor.
-            batch = [asdict(model_cls(*row)) for row in rows]
-            yield batch
-
-    def iter_all_tables(self, tables: Iterable[str], batch_size: int = 1000) -> Iterator[tuple[str, List[dict]]]:
-        """Yield table_name, batch pairs for multiple tables."""
-
+        data = {}
+        tables = ["genre", "person", "film_work", "genre_film_work", "person_film_work"]
         for table in tables:
-            for batch in self.iter_table_rows(table, batch_size=batch_size):
-                yield table, batch
+            data[table] = get_data(table)
+
+        return data
