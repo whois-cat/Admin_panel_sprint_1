@@ -1,60 +1,66 @@
-import os
+from __future__ import annotations
+
 import logging
-import psycopg2
+from pathlib import Path
+from typing import Iterable, List, Sequence
+
+from psycopg2 import sql
 from psycopg2.extensions import connection as _connection
+from psycopg2.extras import execute_values
 
 
-def measure_time(func):
-    def time_it(*args, **kwargs):
-        time_started = time.time()
-        func(*args, **kwargs)
-        time_elapsed = time.time()
-        logging.info("{execute} running time is {sec} seconds for inserting {rows} rows.".format(execute=func.__name__,
-            sec=round(
-            time_elapsed - time_started,
-            4), rows=len(
-            kwargs.get('values')))
-        )
-    return time_it
+logger = logging.getLogger(__name__)
 
 
 class PostgresSaver:
+    """Writes batches of rows into Postgres."""
+
     def __init__(self, psql_conn: _connection):
         self.connection = psql_conn
         self.cursor = self.connection.cursor()
 
-    def create_tables(self):
-        path = os.path.abspath(
-            os.path.join(__file__, "../..", "schema_design", "postgres_schema.sql")
+    def ensure_schema(self) -> None:
+        """Create tables if they do not exist."""
+
+        repo_root = Path(__file__).resolve().parents[1]
+        schema_path = repo_root / "schema_design" / "postgres_schema.sql"
+
+        schema_sql = schema_path.read_text(encoding="utf-8")
+
+        self.cursor.execute(schema_sql)
+        self.connection.commit()
+        logger.info("Schema ensured (schema_design/postgres_schema.sql).")
+
+    def insert_batch(self, table: str, rows: List[dict], page_size: int = 1000) -> int:
+        """Insert one batch into content.<table>."""
+
+        if not rows:
+            return 0
+
+        columns: Sequence[str] = list(rows[0].keys())
+        values: List[tuple] = [tuple(row[col] for col in columns) for row in rows]
+
+        query = sql.SQL(
+            "INSERT INTO content.{table} ({cols}) VALUES %s ON CONFLICT (id) DO NOTHING"
+        ).format(
+            table=sql.Identifier(table),
+            cols=sql.SQL(", ").join(sql.Identifier(c) for c in columns),
         )
-        self.cursor.execute(open(f"{path}", "r").read())
-        logging.info("Schema was created.")
+
+        execute_values(
+            self.cursor,
+            query.as_string(self.cursor),
+            values,
+            page_size=page_size,
+        )
+        return len(values)
+
+    def save_table_stream(self, table: str, batches: Iterable[List[dict]], batch_size: int = 1000) -> None:
+        """Save a stream of batches for a given table."""
+
+        total = 0
+        for batch in batches:
+            total += self.insert_batch(table, batch, page_size=batch_size)
+
         self.connection.commit()
-
-    def save_all_data(self, data):
-        for table in data:
-            for data_table in data[table]:
-                columns_names = data_table.keys()
-
-                try:
-                    self.cursor.execute(
-                        "INSERT into content.{0} ({1}) VALUES ({2}) ON CONFLICT (id) DO NOTHING".format(
-                            table,
-                            ", ".join(columns_names),
-                            ", ".join("%s" for _ in range(len(columns_names))),
-                        ),
-                        tuple(data_table.values()),
-                    )
-                except psycopg2.DatabaseError as error:
-                    logging.exception(error)
-                    self.cursor.execute(
-                        "select * from pg_tables where schemaname='content';"
-                    )
-                    if not bool(self.cursor.rowcount):
-                        self.create_tables()
-
-
-            logging.info(
-                f"Data from {table} was migrated."
-            )
-        self.connection.commit()
+        logger.info("Migrated table %s (processed %d rows).", table, total)
