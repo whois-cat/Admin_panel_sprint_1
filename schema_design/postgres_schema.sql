@@ -44,7 +44,12 @@ CREATE TABLE IF NOT EXISTS content.genre_film_work (
         ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TYPE person_role AS ENUM ('actor', 'director', 'writer');
+DO $$
+BEGIN
+    CREATE TYPE person_role AS ENUM ('actor', 'director', 'writer');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS content.person_film_work (
     id uuid PRIMARY KEY,
